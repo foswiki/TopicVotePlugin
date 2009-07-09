@@ -1,0 +1,4 @@
+# Release manifest for TopicVotePlugin
+data/System/TopicVotePlugin.txt 0644 Documentation
+lib/Foswiki/Plugins/TopicVotePlugin.pm 0644 Perl module
+

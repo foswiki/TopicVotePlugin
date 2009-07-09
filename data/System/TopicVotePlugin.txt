@@ -1,0 +1,129 @@
+---+!! !TopicVotePlugin
+<!--
+One line description, required for extensions repository catalog.
+   * Set SHORTDESCRIPTION = Enables voting on topics
+-->
+%SHORTDESCRIPTION%
+
+%TOC%
+
+---++ Description
+
+The plugin allows you to setup a voting system for topics. Imagine you have an idea, 
+innovation or suggestion described in a topic and wants wiki users to vote for it, 
+TopicVotePlugin let you setup and manage a voting system. You can even include multiple 
+topics in your voting system or in this case in your poll.
+   
+There is a configuration topic for each voting system to define users and to set a number 
+of credit points for them. All these users can now participate in that voting and 
+share their credit points out on sevaral topics belonging to your poll.
+
+---++ Usage
+
+---+++ Setup new voting system
+
+To setup a new voting system simply add =%<nop>TOPICVOTESETUP%= to a topic. 
+It will automatically inserts the necessary table for configuration: 
+
+| *Header* | *Description* | 
+| username | name of wikiuser who participate |
+| credit points | number of remaining credit points to share out |
+| latest vote | datetime of users last vote |
+| comment | use it for any comment about that user | 
+
+Each table row defines a wikiuser and a number of credit points. 
+Add as many wikiusers as you want to join your voting.
+
+Additionally another table will be inserted which is used for logging
+all submitted votes. Do not touch this table!
+
+| *Column:* | *Description:* |
+| date | date of that log entry |
+| username | name of wikiuser who has voted |
+| topic | name of topic which has been voted |
+| credit points | number of shared credit points on that topic |
+
+__Note:__ Do not touch this table! It is updating automatically. Any editing manually
+will mix up the voting stats.
+
+---+++ Include topic
+To include a topic into a voting system simply add =%<nop>TOPICVOTE{...}%= to a topic. 
+
+Supported parameters:
+
+| *Parameter:* | *Description:* | *Default:* |
+| =topic=""= | The topic which contains the necessary voting system | Current topic |
+| =disable=""= | Set disable="1" to disable voting for the current topic | 0 | 
+
+The makro renders a form to submit credit points and vote for the current topic. 
+It also adds additional information about the voting:
+
+| *Row:* | *Description:* |
+| topic score | Total of all shared credit points on the current topic |
+| credit points shared | Total of all shared credit points on the current topic from logged in user |
+| credit points left | Remaining credit points for that voting of logged in user | 
+
+You can include as many topics as you want to be part of one voting system.
+
+---++ Examples
+
+---+++ Voting system
+
+*Voting setup*
+<!-- DO NOT CHANGE TABLE ORDER -->
+| *username* | *credit points* | *latest vote* | *comment* |
+| Main.JohnConnor | 9 | - | just an example wikiuser |
+| Main.ThomasAnderson | 15 | - | - |
+
+*Voting log*
+<!-- DO NOT EDIT THIS TABLE -->
+| *date* | *username* | *topic* | *credit points* |
+| 12. Jul 2009 - 10:33:07 | Main.JohnConnor | Main.MoreFreshFruits | 7 |
+| 07. Jul 2009 - 15:03:30 | Main.JohnConnor | Main.LessTerminatorSequels | 4 |
+| 03. Jul 2009 - 11:28:01 | Main.ThomasAnderson | Main.MoreITSupport | 5 |
+
+---+++ Voting Topic
+
+| *topic score: 7* ||
+| credit points shared: | 11 |
+| credit points left: | 9 |
+| *Vote for it* | *<form action="#"><input type="text" size="3" /> <input type="button" value="vote!" class="foswikiButton" /></form>* |
+
+---++ Installation Instructions
+
+__Note:__ You do not need to install anything in the browser to use this extension. 
+The following instructions are for the administrator who installs the extension on the server:
+
+   * Open configure, and open the "Extensions" section. 
+   * Use "Find More Extensions" to get a list of available extensions. 
+   * Select "Install".
+
+You can also visit the Plugin Home for a manually installation:
+
+   * Download the ZIP file from the [[http://foswiki.org/bin/view/Extensions/TopicVotePlugin][Plugin Home]]
+   * Unzip ==%TOPIC%.zip== in your Foswiki installation directory. Content:
+     | *File:* | *Description:* |
+     | ==data/System/%TOPIC%.txt== | Plugin topic |
+     | ==lib/Foswiki/Plugins/%TOPIC%.pm== | Plugin Perl module |
+   * Run the [[%SCRIPTURL%/configure%SCRIPTSUFFIX%][configure]] script, and enable the plugin in the {Plugins} section.
+   * Add =%<nop>VOTESETUP%= to a topic to test if the installation was successful.
+
+---++ Info
+
+Many thanks to the following sponsors for supporting this work:
+
+[[http://www.reifenhauser-group.com/en/index.asp][<img src="%ATTACHURLPATH%/reifenhauser-logo.gif" border="0" alt="Reifenhaeuser !GmbH & Co. KG Maschinenfabrik" />]]
+
+[[http://www.reifenhauser-group.com/en/index.asp][Reifenh&auml;user GmbH & Co. KG Maschinenfabrik]]
+
+|  Author(s): | Foswiki:Main.SvenHess |
+|  Copyright: | &copy; 2009, Foswiki:Main.SvenHess |
+|  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
+|  Version: | 1.0 |
+|  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  08 July 2009: | Initial version |
+|  Dependencies: | none |
+|  Home page: | http://foswiki.org/bin/view/Extensions/TopicVotePlugin |
+|  Support: | http://foswiki.org/bin/view/Support/TopicVotePlugin |
+
+<!-- Do _not_ attempt to edit this topic; it is auto-generated. -->
