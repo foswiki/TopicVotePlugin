@@ -17,14 +17,14 @@
 package Foswiki::Plugins::TopicVotePlugin;
 
 use strict;
-
+use Data::Dumper;
 require Foswiki::Func;    # The plugins API
 require Foswiki::Plugins; # For the API version
 
 use vars qw(%pollUser %pollLog %config);
 
 our $VERSION = '$Rev: 3048 (2009-03-12) $';
-our $RELEASE = 'v1.0';
+our $RELEASE = 'v1.1';
 our $SHORTDESCRIPTION = 'Enables voting on topics';
 our $NO_PREFS_IN_TOPIC = 1;
 
@@ -41,7 +41,7 @@ sub initPlugin {
     }
 
     # get name of current wiki user
-    $config{USER} = $user;
+    $config{USER} = Foswiki::Func::getWikiName($user);
     
     # register handler for enabling votings
     Foswiki::Func::registerTagHandler( 'TOPICVOTE', \&_topicvote );
@@ -56,10 +56,13 @@ sub initPlugin {
     return 1;
 }
 
-# creates necessary configuration tables
-# and saves to current topic
+# creates necessary configuration tables:
+# - saves setup to current topic
+# - saves log to current topic +Log 
 sub _topicvotesetup {
   my ( $session, $params, $topic, $webName ) = @_;
+  
+  $config{TOPICLOG} = $topic."Log";
   
   my( $meta, $topicdata ) = Foswiki::Func::readTopic( $webName, $topic );
   
@@ -67,14 +70,22 @@ sub _topicvotesetup {
   $plugin_conf_table .= "\n<!-- DO NOT CHANGE TABLE ORDER -->";
   $plugin_conf_table .= "\n| *username* | *credit points* | *latest vote* | *comment* |\n";
   $plugin_conf_table .= "| Main.ExampleUser | 20 | - | please edit me |\n\n";
+  $plugin_conf_table .= "Log: ".$config{TOPICLOG};
   
-  my $plugin_log_table = "*Voting log*";
+  $topicdata =~ s/%TOPICVOTESETUP%\s*/$plugin_conf_table/mg;
+  
+  Foswiki::Func::saveTopic( $webName, $topic, $meta, $topicdata);
+  
+  my( $logMeta, $logTopicdata ) = Foswiki::Func::readTopic( $webName, $config{TOPICLOG} );
+  
+  my $plugin_log_table = "\n\n*Voting log*";
   $plugin_log_table .= "\n<!-- DO NOT EDIT THIS TABLE -->";
   $plugin_log_table .= "\n| *date* | *username* | *topic* | *credit points* |\n\n";
+  $plugin_log_table .= "Setup: ".$topic;
+    
+  $logTopicdata .= $plugin_log_table;
   
-  $topicdata =~ s/%TOPICVOTESETUP%\s*/$plugin_conf_table$plugin_log_table/mg;
-  
-  Foswiki::Func::saveTopic( $webName, $topic, $meta, $topicdata, { minor => 1 } );
+  Foswiki::Func::saveTopic( $webName, $config{TOPICLOG}, $logMeta, $logTopicdata);
   _redirect($webName, $topic);
   
   return '';
@@ -86,30 +97,34 @@ sub _topicvote {
   
   my $config_topic = $params->{topic} || $params->{"_DEFAULT"} || $topic;
   my $disable = $params->{disable};
+  my $max_points = $params->{maxpoints} || 0;
     
-  ( $config{CONFWEB}, $config{CONFTOPIC} ) =
+  if($config_topic =~ m/\./g) {
+    ( $config{CONFWEB}, $config{CONFTOPIC} ) =
       $Foswiki::Plugins::SESSION->normalizeWebTopicName( '', $config_topic );
+  }
+  else {
+    ( $config{CONFWEB}, $config{CONFTOPIC} ) =
+      $Foswiki::Plugins::SESSION->normalizeWebTopicName( $webName, $config_topic );
+  }  
   
+  $config{TOPICLOG} =
+      $Foswiki::Plugins::SESSION->normalizeWebTopicName( $config{CONFWEB}, $config{CONFTOPIC}."Log" );
+  
+     
   # creates hash of all voters
   _createVoterList();
   
   # creates hash of all saved votes
   _createPollLog();
-  
+     
   # checks if vote configuration found
   if(scalar keys %pollUser < 1) {
     
     my $mes = "No configuration found.";
     return _error($mes);
   }
-   
-  # checks voting permission of current user
-  if(!exists $pollUser{$config{USER}}) {
-    
-    my $mes = "";
-    return _error($mes);
-  }
-    
+       
   my $sum_points = 0;
   my $user_votes = 0;
   
@@ -123,15 +138,31 @@ sub _topicvote {
     }
   }
   
+  # add topic score to meta data of topic
+  _addMetaInfo($webName, $topic, $sum_points);
+  
+ 
   # creates voting stats
   my $voting_stats = "| *topic score: $sum_points* || \n";
-  $voting_stats .= "| credit points shared: | ".$user_votes." |\n";
+  
+  # checks voting permission of current user
+  if(!exists $pollUser{$config{USER}}) {
+    return $voting_stats;
+  }
+  
+  my $stats_suffic = "";
+  $stats_suffic = "(of $max_points)" if($max_points > 0);
+  
+  $voting_stats .= "| credit points shared: | ".$user_votes." $stats_suffic |\n";
+  $voting_stats .= "";
   $voting_stats .= "| credit points left: | ".$pollUser{$config{USER}}{points}." |\n";
   
   my $voting_form = '';
   
   # checks user credits left and voting not disabled
-  if(($pollUser{$config{USER}}{points} > 0) && ($disable ne 1)) {
+  if(($pollUser{$config{USER}}{points} > 0) && 
+     (($max_points < 1) || ($user_votes < $max_points)) && 
+     ($disable ne 1)) {
     
     # creates voting form
     $voting_form = "| *Vote for it* |";
@@ -139,11 +170,31 @@ sub _topicvote {
     $voting_form .= " <input type=\"submit\" value=\"vote!\" class=\"foswikiButton\" />";
     $voting_form .= " <input type=\"hidden\" value=\"".$webName.".".$topic."\" name=\"voted_t\" />";
     $voting_form .= " <input type=\"hidden\" value=\"".$config{CONFWEB}.".".$config{CONFTOPIC}."\" name=\"conf_t\" />";
+    $voting_form .= " <input type=\"hidden\" value=\"".$max_points."\" name=\"max_p\" />";
     $voting_form .= "</form>* |";
   }    
 
   
   return $voting_stats.$voting_form;
+}
+
+
+sub _addMetaInfo {
+  my ($web, $topic, $score) = @_;
+
+  # get topic text and meta data of current topic
+  my ( $meta, $topicdata ) = Foswiki::Func::readTopic($web, $topic);
+    
+  
+  # add meta data  
+  $meta->putKeyed( 'FIELD', { name => $config{CONFTOPIC}."Score", 
+                              title => 'Topic score',
+                              value =>$score } );
+
+  Foswiki::Func::saveTopic( $web, $topic, $meta, $topicdata, 
+                          { dontlog => 1, minor => 1 } );
+
+  $meta->finish();
 }
 
 
@@ -164,7 +215,7 @@ sub _createVoterList {
 sub _createPollLog {
   
   # get topic text of configuration topic
-  my $topicdata = Foswiki::Func::readTopic($config{CONFWEB}, $config{CONFTOPIC});
+  my $topicdata = Foswiki::Func::readTopic($config{CONFWEB}, $config{TOPICLOG});
   
   my $wikiword_p = $Foswiki::regex{wikiWordRegex};
   my $webname_p = $Foswiki::regex{webNameRegex};
@@ -206,7 +257,7 @@ sub _updatePollLog {
   my $theader;
   
     
-  my( $meta, $topicdata ) = Foswiki::Func::readTopic($config{CONFWEB}, $config{CONFTOPIC});
+  my( $meta, $topicdata ) = Foswiki::Func::readTopic($config{CONFWEB}, $config{TOPICLOG});
   
   
   if($topicdata 
@@ -219,7 +270,7 @@ sub _updatePollLog {
   $theader = quotemeta($theader);
   
   if($topicdata =~ s/^$theader/$log/mgo) {
-    Foswiki::Func::saveTopic( $config{CONFWEB}, $config{CONFTOPIC}, $meta, $topicdata );
+    Foswiki::Func::saveTopic( $config{CONFWEB}, $config{TOPICLOG}, $meta, $topicdata );
   }
   
   return 1; 
@@ -280,6 +331,7 @@ sub _restSaveVote {
   my $submitted_credits = $query->param('credits');
   my $voted_topic = $query->param('voted_t');
   my $config_topic = $query->param('conf_t');
+  my $max_points = $query->param('max_p');
   
   # validate submitted input
   if( ($submitted_credits !~ m/^[1-9]{1}[0-9]*$/i) || ($voted_topic eq "") 
@@ -291,11 +343,22 @@ sub _restSaveVote {
   ( $config{CONFWEB}, $config{CONFTOPIC} ) =
       $Foswiki::Plugins::SESSION->normalizeWebTopicName( '', $config_topic );
   
+  $config{TOPICLOG} =
+      $Foswiki::Plugins::SESSION->normalizeWebTopicName( $config{CONFWEB}, $config{CONFTOPIC}."Log" );
   
   # create hash of all voters
   _createVoterList();
   
-  
+  # create hash of voterlog
+  _createPollLog();  
+   
+  # check if user max points reached to share for that topic
+  if( ($max_points > 0) && 
+      ((_getSharedPoints($voted_topic) + $submitted_credits) > $max_points)) {
+    
+    return _redirect('', $voted_topic);
+  }
+    
   # check if user has permission to vote AND has credit points left
   if((exists $pollUser{$config{USER}}) && ($pollUser{$config{USER}}{points} > 0)) {
      
@@ -312,6 +375,19 @@ sub _restSaveVote {
   
   # redirect to current topic
   return _redirect('', $voted_topic);
+}
+
+sub _getSharedPoints {
+  my ($voted_topic) = @_;
+  my $sharedPoints = 0;
+  
+  while ((my $date, my $points) = each(%{$pollLog{$config{USER}}{$voted_topic}})) {
+    $sharedPoints += $points;
+  } 
+  
+  
+  
+  return $sharedPoints;  
 }
 
 # redirects to specific topic
@@ -332,6 +408,15 @@ sub _error {
   my $error_label_end = "%ENDCOLOR%";  
   
   return $error_label.$mes.$error_label_end;
+}
+
+# just for testing. writes dump var to votelog.txt.
+sub writeDumper {
+    
+  open(OUT,">/var/www/foswiki/votelog.txt");
+  print OUT Dumper(@_);
+  close OUT;
+
 }
 
 1;

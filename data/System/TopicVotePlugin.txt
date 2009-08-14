@@ -34,8 +34,9 @@ It will automatically inserts the necessary table for configuration:
 Each table row defines a wikiuser and a number of credit points. 
 Add as many wikiusers as you want to join your voting.
 
-Additionally another table will be inserted which is used for logging
-all submitted votes. Do not touch this table!
+Additionally another table will be generated which is used for logging
+all submitted votes. This log table will be inserted in a new topic called "[SETUPTOPIC]Log" 
+to separate logging from configuation. The inserted table looks like:
 
 | *Column:* | *Description:* |
 | date | date of that log entry |
@@ -53,6 +54,7 @@ Supported parameters:
 
 | *Parameter:* | *Description:* | *Default:* |
 | =topic=""= | The topic which contains the necessary voting system | Current topic |
+| =maxpoints=""= | Defines the maximum of credit points a user can share out on that topic.%BR%Set "0" for no limitation. | 0 | 
 | =disable=""= | Set disable="1" to disable voting for the current topic | 0 | 
 
 The makro renders a form to submit credit points and vote for the current topic. 
@@ -64,6 +66,20 @@ It also adds additional information about the voting:
 | credit points left | Remaining credit points for that voting of logged in user | 
 
 You can include as many topics as you want to be part of one voting system.
+
+---+++ Chart your score
+Each participating topic carries its voting score in a meta field with the following 
+syntax:
+<verbatim>
+// if your configuration topic is "TopicVoteSetup"
+% META:FIELD{name="TopicVoteSetupScore" title="Topic score" value="5"} %
+</verbatim>
+
+Just use the foswiki SEARCH Tag for charting your votings by searching that meta field. 
+For example:
+<verbatim>
+%SEARCH{"TopicVoteSetupScore" type="query" format="| $topic | $formfield(TestTopic21Score) |" nonoise="on"}%
+</verbatim>
 
 ---++ Examples
 
@@ -91,13 +107,6 @@ You can include as many topics as you want to be part of one voting system.
 
 ---++ Installation Instructions
 
-__Note:__ You do not need to install anything in the browser to use this extension. 
-The following instructions are for the administrator who installs the extension on the server:
-
-   * Open configure, and open the "Extensions" section. 
-   * Use "Find More Extensions" to get a list of available extensions. 
-   * Select "Install".
-
 You can also visit the Plugin Home for a manually installation:
 
    * Download the ZIP file from the [[http://foswiki.org/bin/view/Extensions/TopicVotePlugin][Plugin Home]]
@@ -106,7 +115,7 @@ You can also visit the Plugin Home for a manually installation:
      | ==data/System/%TOPIC%.txt== | Plugin topic |
      | ==lib/Foswiki/Plugins/%TOPIC%.pm== | Plugin Perl module |
    * Run the [[%SCRIPTURL%/configure%SCRIPTSUFFIX%][configure]] script, and enable the plugin in the {Plugins} section.
-   * Add =%<nop>VOTESETUP%= to a topic to test if the installation was successful.
+   * Add =%<nop>TOPICVOTESETUP%= to a topic to test if the installation was successful.
 
 ---++ Info
 
@@ -119,8 +128,9 @@ Many thanks to the following sponsors for supporting this work:
 |  Author(s): | Foswiki:Main.SvenHess |
 |  Copyright: | &copy; 2009, Foswiki:Main.SvenHess |
 |  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
-|  Version: | 1.0 |
+|  Version: | 1.1 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  13 August 2009: | Added credit points limitation and meta data for topic score |
 |  08 July 2009: | Initial version |
 |  Dependencies: | none |
 |  Home page: | http://foswiki.org/bin/view/Extensions/TopicVotePlugin |
