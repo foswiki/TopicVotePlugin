@@ -17,14 +17,13 @@
 package Foswiki::Plugins::TopicVotePlugin;
 
 use strict;
-use Data::Dumper;
 require Foswiki::Func;    # The plugins API
 require Foswiki::Plugins; # For the API version
 
 use vars qw(%pollUser %pollLog %config);
 
 our $VERSION = '$Rev: 3048 (2009-03-12) $';
-our $RELEASE = 'v1.1';
+our $RELEASE = 'v1.2';
 our $SHORTDESCRIPTION = 'Enables voting on topics';
 our $NO_PREFS_IN_TOPIC = 1;
 
@@ -98,7 +97,8 @@ sub _topicvote {
   my $config_topic = $params->{topic} || $params->{"_DEFAULT"} || $topic;
   my $disable = $params->{disable};
   my $max_points = $params->{maxpoints} || 0;
-    
+  my $format = $params->{'format'} || '$board$form';
+      
   if($config_topic =~ m/\./g) {
     ( $config{CONFWEB}, $config{CONFTOPIC} ) =
       $Foswiki::Plugins::SESSION->normalizeWebTopicName( '', $config_topic );
@@ -111,13 +111,12 @@ sub _topicvote {
   $config{TOPICLOG} =
       $Foswiki::Plugins::SESSION->normalizeWebTopicName( $config{CONFWEB}, $config{CONFTOPIC}."Log" );
   
-     
   # creates hash of all voters
   _createVoterList();
   
   # creates hash of all saved votes
   _createPollLog();
-     
+       
   # checks if vote configuration found
   if(scalar keys %pollUser < 1) {
     
@@ -141,9 +140,10 @@ sub _topicvote {
   # add topic score to meta data of topic
   _addMetaInfo($webName, $topic, $sum_points);
   
+  
  
   # creates voting stats
-  my $voting_stats = "| *topic score: $sum_points* || \n";
+  my $voting_stats = "\n| *topic score: $sum_points* || \n";
   
   # checks voting permission of current user
   if(!exists $pollUser{$config{USER}}) {
@@ -158,24 +158,35 @@ sub _topicvote {
   $voting_stats .= "| credit points left: | ".$pollUser{$config{USER}}{points}." |\n";
   
   my $voting_form = '';
+  my $disable_form = ' readonly="readonly"';
+  my $disable_button = ' disabled="true"';
   
   # checks user credits left and voting not disabled
-  if(($pollUser{$config{USER}}{points} > 0) && 
-     (($max_points < 1) || ($user_votes < $max_points)) && 
-     ($disable ne 1)) {
+#   if(($pollUser{$config{USER}}{points} > 0) && 
+#      (($max_points < 1) || ($user_votes < $max_points)) && 
+#      ($disable ne 1)) {
     
-    # creates voting form
-    $voting_form = "| *Vote for it* |";
-    $voting_form .= "*<form action=\"%SCRIPTURLPATH{\"rest/TopicVotePlugin/savevote\"}%\" method=\"post\"><input type=\"text\" size=\"3\" id=\"credits\" name=\"credits\" />";
-    $voting_form .= " <input type=\"submit\" value=\"vote!\" class=\"foswikiButton\" />";
-    $voting_form .= " <input type=\"hidden\" value=\"".$webName.".".$topic."\" name=\"voted_t\" />";
-    $voting_form .= " <input type=\"hidden\" value=\"".$config{CONFWEB}.".".$config{CONFTOPIC}."\" name=\"conf_t\" />";
-    $voting_form .= " <input type=\"hidden\" value=\"".$max_points."\" name=\"max_p\" />";
-    $voting_form .= "</form>* |";
-  }    
-
+  if(($pollUser{$config{USER}}{points} > 0) && 
+      (($max_points < 1) || ($user_votes < $max_points)) && 
+      ($disable ne 1)) {
+   
+    $disable_form = '';
+    $disable_button = '';
+  }
   
-  return $voting_stats.$voting_form;
+  # creates voting form
+  $voting_form = "\n| <form action=\"%SCRIPTURLPATH{\"rest/TopicVotePlugin/savevote\"}%\" method=\"post\"><input type=\"text\" size=\"3\" id=\"credits\" name=\"credits\"$disable_form />";
+  $voting_form .= " <input type=\"submit\" value=\"vote!\" class=\"foswikiButton\"$disable_button />";
+  $voting_form .= " <input type=\"hidden\" value=\"".$webName.".".$topic."\" name=\"voted_t\" />";
+  $voting_form .= " <input type=\"hidden\" value=\"".$config{CONFWEB}.".".$config{CONFTOPIC}."\" name=\"conf_t\" />";
+  $voting_form .= " <input type=\"hidden\" value=\"".$max_points."\" name=\"max_p\" />";
+  $voting_form .= "</form> |\n";
+
+  $format =~ s/\$score/$sum_points/g;
+  $format =~ s/\$board/$voting_stats/g;
+  $format =~ s/\$form/$voting_form/g;
+  
+  return $format;
 }
 
 
@@ -216,12 +227,12 @@ sub _createPollLog {
   
   # get topic text of configuration topic
   my $topicdata = Foswiki::Func::readTopic($config{CONFWEB}, $config{TOPICLOG});
-  
+ 
   my $wikiword_p = $Foswiki::regex{wikiWordRegex};
   my $webname_p = $Foswiki::regex{webNameRegex};
   
   # extract all votes and create hash of it
-  $topicdata =~ s/^\|\s*(.*?)\s*\|\s*($webname_p\.)?($wikiword_p)\s*\|\s*($webname_p\.$wikiword_p)\s*\|\s*(\d+)\s*\|.*$/_logmap($1,$3,$4,$5)/mego;
+  $topicdata =~ s/^\|\s*(.*?)\s*\|\s*($webname_p\.)?($wikiword_p)\s*\|\s*($webname_p\..*?)\s*\|\s*(\d+)\s*\|.*$/_logmap($1,$3,$4,$5)/mego;
   
   
   return 1;
@@ -397,8 +408,9 @@ sub _redirect() {
   ( $voted_web, $voted_topic) =
       $Foswiki::Plugins::SESSION->normalizeWebTopicName( $voted_web, $voted_topic );
       
+  #return $Foswiki::Plugins::SESSION->redirect( Foswiki::Func::getViewUrl($voted_web, $voted_topic), 0 );
   return Foswiki::Func::redirectCgiQuery(
-        undef, Foswiki::Func::getViewUrl($voted_web, $voted_topic), 1);
+      undef, Foswiki::Func::getViewUrl($voted_web, $voted_topic), 0);
 }
 
 # returns specific error message
@@ -408,15 +420,6 @@ sub _error {
   my $error_label_end = "%ENDCOLOR%";  
   
   return $error_label.$mes.$error_label_end;
-}
-
-# just for testing. writes dump var to votelog.txt.
-sub writeDumper {
-    
-  open(OUT,">/var/www/foswiki/votelog.txt");
-  print OUT Dumper(@_);
-  close OUT;
-
 }
 
 1;

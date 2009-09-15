@@ -56,6 +56,7 @@ Supported parameters:
 | =topic=""= | The topic which contains the necessary voting system | Current topic |
 | =maxpoints=""= | Defines the maximum of credit points a user can share out on that topic.%BR%Set "0" for no limitation. | 0 | 
 | =disable=""= | Set disable="1" to disable voting for the current topic | 0 | 
+| =format=""= | Defines custom look-and-feel for the output by using the format variables: $score, $board, $form %BR%e.g. =format="&lt;font color='red'&gt;$score&lt;/font&gt;&lt;br/&gt;$board $form"= | $board $form |
 
 The makro renders a form to submit credit points and vote for the current topic. 
 It also adds additional information about the voting:
@@ -107,7 +108,7 @@ For example:
 
 ---++ Installation Instructions
 
-You can also visit the Plugin Home for a manually installation:
+Visit the Plugin Home for a manually installation:
 
    * Download the ZIP file from the [[http://foswiki.org/bin/view/Extensions/TopicVotePlugin][Plugin Home]]
    * Unzip ==%TOPIC%.zip== in your Foswiki installation directory. Content:
@@ -128,8 +129,9 @@ Many thanks to the following sponsors for supporting this work:
 |  Author(s): | Foswiki:Main.SvenHess |
 |  Copyright: | &copy; 2009, Foswiki:Main.SvenHess |
 |  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
-|  Version: | 1.1 |
+|  Version: | 1.2 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  15 September 2009: | Added format parameter for customizing output format |
 |  13 August 2009: | Added credit points limitation and meta data for topic score |
 |  08 July 2009: | Initial version |
 |  Dependencies: | none |
