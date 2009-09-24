@@ -146,26 +146,27 @@ sub _topicvote {
   my $voting_stats = "\n| *topic score: $sum_points* || \n";
   
   # checks voting permission of current user
-  if(!exists $pollUser{$config{USER}}) {
-    return $voting_stats;
-  }
+#   if(!exists $pollUser{$config{USER}}) {
+#         
+#   }
+
   
-  my $stats_suffic = "";
-  $stats_suffic = "(of $max_points)" if($max_points > 0);
   
-  $voting_stats .= "| credit points shared: | ".$user_votes." $stats_suffic |\n";
+  my $stats_suffix = "";
+  
+  my $points_left = $pollUser{$config{USER}}{points} || 0; 
+  
+  $stats_suffix = "(of $max_points)" if($max_points > 0);
+  
+  $voting_stats .= "| credit points shared: | $user_votes $stats_suffix |\n";
   $voting_stats .= "";
-  $voting_stats .= "| credit points left: | ".$pollUser{$config{USER}}{points}." |\n";
+  $voting_stats .= "| credit points left: | $points_left |\n";
   
   my $voting_form = '';
   my $disable_form = ' readonly="readonly"';
   my $disable_button = ' disabled="true"';
   
-  # checks user credits left and voting not disabled
-#   if(($pollUser{$config{USER}}{points} > 0) && 
-#      (($max_points < 1) || ($user_votes < $max_points)) && 
-#      ($disable ne 1)) {
-    
+   
   if(($pollUser{$config{USER}}{points} > 0) && 
       (($max_points < 1) || ($user_votes < $max_points)) && 
       ($disable ne 1)) {
