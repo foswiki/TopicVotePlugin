@@ -20,12 +20,12 @@ use strict;
 require Foswiki::Func;    # The plugins API
 require Foswiki::Plugins; # For the API version
 
-use vars qw(%pollUser %pollLog %config);
+use vars qw(%pollUser %pollLog %config $topicVoteAdmin);
 
-our $VERSION = '$Rev: 3048 (2009-03-12) $';
-our $RELEASE = 'v1.2';
+our $VERSION = '$Rev: 3048 (2010-01-12) $';
+our $RELEASE = 'v1.3';
 our $SHORTDESCRIPTION = 'Enables voting on topics';
-our $NO_PREFS_IN_TOPIC = 1;
+our $NO_PREFS_IN_TOPIC = 0;
 
 
 
@@ -41,6 +41,9 @@ sub initPlugin {
 
     # get name of current wiki user
     $config{USER} = Foswiki::Func::getWikiName($user);
+    
+    # get voting admin user name
+    $topicVoteAdmin = Foswiki::Func::getPluginPreferencesValue( "TOPICVOTE_ADMIN" );
     
     # register handler for enabling votings
     Foswiki::Func::registerTagHandler( 'TOPICVOTE', \&_topicvote );
@@ -138,10 +141,8 @@ sub _topicvote {
   }
   
   # add topic score to meta data of topic
-  _addMetaInfo($webName, $topic, $sum_points);
-  
-  
- 
+  _addMetaInfo($session, $webName, $topic, $sum_points);
+   
   # creates voting stats
   my $voting_stats = "\n| *topic score: $sum_points* || \n";
   
@@ -150,8 +151,6 @@ sub _topicvote {
 #         
 #   }
 
-  
-  
   my $stats_suffix = "";
   
   my $points_left = $pollUser{$config{USER}}{points} || 0; 
@@ -192,7 +191,7 @@ sub _topicvote {
 
 
 sub _addMetaInfo {
-  my ($web, $topic, $score) = @_;
+  my ($session, $web, $topic, $score) = @_;
 
   # get topic text and meta data of current topic
   my ( $meta, $topicdata ) = Foswiki::Func::readTopic($web, $topic);
@@ -203,9 +202,17 @@ sub _addMetaInfo {
                               title => 'Topic score',
                               value =>$score } );
 
-  Foswiki::Func::saveTopic( $web, $topic, $meta, $topicdata, 
-                          { dontlog => 1, minor => 1 } );
-
+  # change user for CHANGE rights
+  my $votingAdminUserID = Foswiki::Func::getCanonicalUserID($topicVoteAdmin);
+  if(Foswiki::Func::checkAccessPermission
+        ( "CHANGE", $votingAdminUserID, $topicdata, $topic, $web, $meta )) {
+    my $user_backup = $session->{user};
+    $session->{user} = $votingAdminUserID;
+    Foswiki::Func::saveTopic( $web, $topic, $meta, $topicdata, 
+                            { dontlog => 1, minor => 1 } );
+    $session->{user} = $user_backup;
+  }
+  
   $meta->finish();
 }
 
