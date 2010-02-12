@@ -1,3 +1,4 @@
+%META:TOPICINFO{author="BaseUserMapping_333" date="1264762821" format="1.1" reprev="1.4" version="1.4"}%
 ---+!! !TopicVotePlugin
 <!--
 One line description, required for extensions repository catalog.
@@ -69,17 +70,19 @@ It also adds additional information about the voting:
 You can include as many topics as you want to be part of one voting system.
 
 ---+++ Chart your score
-Each participating topic carries its voting score in a meta field with the following 
-syntax:
-<verbatim>
-// if your configuration topic is "TopicVoteSetup"
-% META:FIELD{name="TopicVoteSetupScore" title="Topic score" value="5"} %
-</verbatim>
+You can define a !DataForm to store the voting score in each participating topic. The Plugin will automatically update
+the score meta field after an user has vote for the topic. The !DataForm should provide at least the fields described 
+in the following example:
 
-Just use the foswiki SEARCH Tag for charting your votings by searching that meta field. 
-For example:
+| *Name* | *Type* | *Size* | *Values* | *Tooltip message* | *Attributes* |
+| Score | label | 2 | 0 | (total score of a topic) | H | 
+| Configurationtopic | label | 10 | 0 | (name of the topic where the voting configuration is set up) | H | 
+
+The type "label" ensures that no user can modify it manually.
+
+Just use the foswiki SEARCH macro for charting your votings by searching that !DataForm: 
 <verbatim>
-%SEARCH{"TopicVoteSetupScore" type="query" format="| $topic | $formfield(TestTopic21Score) |" nonoise="on"}%
+%SEARCH{"form.name~'*YourDataForm'" type="query" format="| $topic | $formfield(Score) |" nonoise="on"}%
 </verbatim>
 
 __Note:__ Since it is necessary to edit the meta data of the voting topic, your participants need to have CHANGE rights. 
@@ -135,8 +138,9 @@ Many thanks to the following sponsors for supporting this work:
 |  Author(s): | Foswiki:Main.SvenHess |
 |  Copyright: | &copy; 2009, Foswiki:Main.SvenHess |
 |  License: | [[http://www.gnu.org/licenses/gpl.html][GPL (Gnu General Public License)]] |
-|  Version: | 1.3 |
+|  Version: | 1.3.1 |
 |  Change History: | <!-- versions below in reverse order -->&nbsp; |
+|  29 January 2010: | All topic editing is now handled by the seperate defined user to keep the user rights low |
 |  12 January 2010: | Meta field manipulation is now handled by a seperate defined user |
 |  15 September 2009: | Added format parameter for customizing output format |
 |  13 August 2009: | Added credit points limitation and meta data for topic score |

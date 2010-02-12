@@ -17,13 +17,14 @@
 package Foswiki::Plugins::TopicVotePlugin;
 
 use strict;
+use Data::Dumper;
 require Foswiki::Func;    # The plugins API
 require Foswiki::Plugins; # For the API version
 
 use vars qw(%pollUser %pollLog %config $topicVoteAdmin);
 
-our $VERSION = '$Rev: 3048 (2010-01-12) $';
-our $RELEASE = 'v1.3';
+our $VERSION = '$Rev: 3048 (2010-01-29) $';
+our $RELEASE = 'v1.3.1';
 our $SHORTDESCRIPTION = 'Enables voting on topics';
 our $NO_PREFS_IN_TOPIC = 0;
 
@@ -139,17 +140,9 @@ sub _topicvote {
       $user_votes += $points if($user eq $config{USER});
     }
   }
-  
-  # add topic score to meta data of topic
-  _addMetaInfo($session, $webName, $topic, $sum_points);
    
   # creates voting stats
   my $voting_stats = "\n| *topic score: $sum_points* || \n";
-  
-  # checks voting permission of current user
-#   if(!exists $pollUser{$config{USER}}) {
-#         
-#   }
 
   my $stats_suffix = "";
   
@@ -192,27 +185,28 @@ sub _topicvote {
 
 sub _addMetaInfo {
   my ($session, $web, $topic, $score) = @_;
-
+  
   # get topic text and meta data of current topic
   my ( $meta, $topicdata ) = Foswiki::Func::readTopic($web, $topic);
-    
-  
-  # add meta data  
-  $meta->putKeyed( 'FIELD', { name => $config{CONFTOPIC}."Score", 
-                              title => 'Topic score',
-                              value =>$score } );
 
-  # change user for CHANGE rights
+  # change user to VotingAdmin
   my $votingAdminUserID = Foswiki::Func::getCanonicalUserID($topicVoteAdmin);
   if(Foswiki::Func::checkAccessPermission
         ( "CHANGE", $votingAdminUserID, $topicdata, $topic, $web, $meta )) {
     my $user_backup = $session->{user};
     $session->{user} = $votingAdminUserID;
-    Foswiki::Func::saveTopic( $web, $topic, $meta, $topicdata, 
+    
+    # add meta data  
+    $meta->putKeyed( 'FIELD', { name => 'Score',
+                                title => 'Topic score',
+                                value =>$score } );
+    $meta->putKeyed( 'FIELD', { name => 'Configurationtopic',
+                                value =>$config{CONFTOPIC} } );
+                                
+    Foswiki::Func::saveTopic( $web, $topic, $meta, $topicdata,
                             { dontlog => 1, minor => 1 } );
     $session->{user} = $user_backup;
   }
-  
   $meta->finish();
 }
 
@@ -221,7 +215,7 @@ sub _createVoterList {
 
   # get topic text of configuration topic
   my $topicdata = Foswiki::Func::readTopic($config{CONFWEB}, $config{CONFTOPIC});
-    
+  
   my $wikiword_p = $Foswiki::regex{wikiWordRegex};
   my $webname_p = $Foswiki::regex{webNameRegex};
   
@@ -269,9 +263,7 @@ sub _userlistmap {
 
 # inserts new vote to credit log
 sub _updatePollLog {
-  my $submitted_credits = $_[0];
-  my $voted_topic = $_[1];
-  my $today = $_[2];
+  my ($submitted_credits, $voted_topic, $today, $session) = @_;
   my $log;
   my $theader;
   
@@ -289,7 +281,18 @@ sub _updatePollLog {
   $theader = quotemeta($theader);
   
   if($topicdata =~ s/^$theader/$log/mgo) {
-    Foswiki::Func::saveTopic( $config{CONFWEB}, $config{TOPICLOG}, $meta, $topicdata );
+    my $user_backup = $session->{user};
+    my $votingAdminUserID = Foswiki::Func::getCanonicalUserID($topicVoteAdmin);
+    if(Foswiki::Func::checkAccessPermission
+          ( "CHANGE", $votingAdminUserID, $topicdata, $config{TOPICLOG}, $config{CONFWEB}, $meta )) {
+      $session->{user} = $votingAdminUserID;
+      Foswiki::Func::saveTopic( $config{CONFWEB}, $config{TOPICLOG}, $meta, $topicdata );
+    }
+    else {
+      $session->{user} = $user_backup;
+      Foswiki::Func::saveTopic( $config{CONFWEB}, $config{TOPICLOG}, $meta, $topicdata );
+    }
+    $session->{user} = $user_backup;
   }
   
   return 1; 
@@ -300,8 +303,7 @@ sub _updatePollLog {
 #
 # return 1 - if setting succed
 sub _updatePollConfig {
-  my $submitted_credits = $_[0];
-  my $today = $_[1];
+  my ($submitted_credits, $today, $session) = @_;
   my $confentry;
       
   my( $meta, $topicdata ) = Foswiki::Func::readTopic($config{CONFWEB}, $config{CONFTOPIC});
@@ -327,7 +329,18 @@ sub _updatePollConfig {
       my $editentry = "| $config{USER} | $new_credits | $today | $comment |";
       
       if($topicdata =~ s/$confentry/$editentry/mgo) {
-        Foswiki::Func::saveTopic( $config{CONFWEB}, $config{CONFTOPIC}, $meta, $topicdata );
+        my $user_backup = $session->{user};
+        my $votingAdminUserID = Foswiki::Func::getCanonicalUserID($topicVoteAdmin);
+        if(Foswiki::Func::checkAccessPermission
+              ( "CHANGE", $votingAdminUserID, $topicdata, $config{CONFTOPIC}, $config{CONFWEB}, $meta )) {
+          $session->{user} = $votingAdminUserID;
+          Foswiki::Func::saveTopic( $config{CONFWEB}, $config{CONFTOPIC}, $meta, $topicdata );
+        }
+        else {
+          $session->{user} = $user_backup;
+          Foswiki::Func::saveTopic( $config{CONFWEB}, $config{CONFTOPIC}, $meta, $topicdata );
+        }
+        $session->{user} = $user_backup;        
         return 1;
       }
     }
@@ -385,10 +398,12 @@ sub _restSaveVote {
     my $today = Foswiki::Time::formatTime(time, '$day. $month $year - $hours:$minutes:$seconds');
     
     # check if updating credits of current user succeeded
-    if(_updatePollConfig($submitted_credits, $today)) {
+    if(_updatePollConfig($submitted_credits, $today, $session)) {
       
       # save submitted credits of current user to credit log
-      _updatePollLog($submitted_credits, $voted_topic, $today);
+      _updatePollLog($submitted_credits, $voted_topic, $today, $session);
+      
+      _updateMetaInfo($voted_topic, $session);      
     }
   }
   
@@ -403,10 +418,29 @@ sub _getSharedPoints {
   while ((my $date, my $points) = each(%{$pollLog{$config{USER}}{$voted_topic}})) {
     $sharedPoints += $points;
   } 
-  
-  
-  
+ 
   return $sharedPoints;  
+}
+
+
+sub _updateMetaInfo {
+  my ($voted_topic, $session) = @_;  
+  my $sum_points = 0;
+  
+  _createPollLog();
+  
+  my ( $webName, $topic ) =
+      Foswiki::Func::normalizeWebTopicName( '', $voted_topic );
+  
+  # Sum up all votes from user and topic
+  while (my $user = each(%pollLog)) {    
+    while ((my $date, my $points) = each(%{$pollLog{$user}{$webName.".".$topic}})) {
+      $sum_points += $points;
+    }
+  }
+  
+  # add topic score to meta data of topic
+  _addMetaInfo($session, $webName, $topic, $sum_points);
 }
 
 # redirects to specific topic
